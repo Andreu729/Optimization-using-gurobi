@@ -62,18 +62,27 @@ model.addConstrs((gp.quicksum(x[f"s_{i}ra"][f"u_{j}r"] for i in S) - x[f"u_{j}r"
 model.addConstrs((x[f"u_{i}r"][f"u_{i}"] + gp.quicksum(x[f"s_{j}ca"][f"u_{i}"] for j in S_M) == d[i] for i in C))
 
 # Restricciones de carga por cada flujo.
-model.addConstrs((x["O"][f"p_{i}"] >= e_min[i] for i in P))
 
-model.addConstrs((x["O"][f"p_{i}"] <= e_max[i] for i in P))
 
-model.addConstrs((x[f"s_{i}r"][f"s_{i}ra"] <= LR[i] for i in S_M))
+for i in P:
+    x["O"][f"p_{i}"].lb = e_min[i]
+    x["O"][f"p_{i}"].ub = e_max[i]
 
-model.addConstrs((x[f"s_{i}c"][f"s_{i}ca"] <= o_max[i] for i in S_M))
+for i in S_M:
+    x[f"s_{i}r"][f"s_{i}ra"].ub = LR[i]
+    x[f"s_{i}c"][f"s_{i}ca"].ub = o_max[i]
 
-model.addConstrs((x[f"s_{i}r"][f"s_{i}ra"] >= o_min[i] for i in S_R))
+for i in S_R:
+    x[f"s_{i}r"][f"s_{i}ra"].lb = o_min[i]
+    x[f"s_{i}r"][f"s_{i}ra"].ub = o_max[i]
 
-model.addConstrs((x[f"s_{i}r"][f"s_{i}ra"] <= o_max[i] for i in S_R))
+for i in C:
+    x[f"u_{i}r"][f"u_{i}"].lb = d_r[i]
 
-model.addConstrs((x[f"u_{i}r"][f"u_{i}"] >= d_r[i] for i in C))
+model.addConstrs((x[f"s_{i}r"][f"s_{i}ra"] + x[f"s_{i}c"][f"s_{i}ca"] <= o_max[i] for i in S_M))
+model.addConstrs((x[f"s_{i}r"][f"s_{i}ra"] + x[f"s_{i}c"][f"s_{i}ca"] >= o_min[i] for i in S_M))
+
+model.Params.Method = 0
+model.Params.NetworkAlg = 1
 
 model.optimize()

@@ -50,4 +50,7 @@ model.addConstrs((d[u] == gp.quicksum(y[s][u] for s in S) for u in C), "demanda_
 # Demanda renovable de cada usuario
 model.addConstrs((d_r[u] <= gp.quicksum(y[s][u] for s in S_R) for u in C), "demanda_n")
 
+# Balance de masa
+model.addConstrs((gp.quicksum(x[p][s] for p in P) == gp.quicksum(y[s][u] for u in C) for s in S), "Balance_xy")
+
 model.optimize()
