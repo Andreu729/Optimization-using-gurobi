@@ -15,12 +15,12 @@ n_usuarios = 10
 # Por default addVars pone un lower_bound = 0
 for i in P:
 
-    columna = model.addVars(len(S), vtype=gp.GRB.CONTINUOUS, name=f"x{i}")
+    columna = model.addVars(S, vtype=gp.GRB.CONTINUOUS, name=f"x{i}")
     x[i] = columna
 
 for i in S:
 
-    columna = model.addVars(len(C), vtype=gp.GRB.CONTINUOUS, name=f"y{i}")
+    columna = model.addVars(C, vtype=gp.GRB.CONTINUOUS, name=f"y{i}")
     y[i] = columna
 
 # Anular ciertas variables
