@@ -1,11 +1,14 @@
 from lector import leer_datos
 import gurobipy as gp
-import sys
+import sys, time
 
 path = sys.argv[1]
 P, P_R, S, S_R, S_M, C, d, d_r, c_p, e_min, e_max, o_min, o_max, LR, t_ps, q_sc = leer_datos(path)
 
 model = gp.Model()
+model.Params.OutputFlag = 0
+print("Comenzando el modelo...")
+tiempo_inicio = time.time()
 x = {}
 y = {}
 n_plantas = 10
@@ -53,4 +56,27 @@ model.addConstrs((d_r[u] <= gp.quicksum(y[s][u] for s in S_R) for u in C), "dema
 # Balance de masa
 model.addConstrs((gp.quicksum(x[p][s] for p in P) == gp.quicksum(y[s][u] for u in C) for s in S), "Balance_xy")
 
+
+
+# Fin del modelo
+tiempo_final = time.time()
+tiempo_tomado = tiempo_final - tiempo_inicio
+
+print("El modelo ha terminado de construirse. Resolviendo...")
+
 model.optimize()
+
+if model.status == gp.GRB.OPTIMAL:
+    print(f"Estado del modelo: OPTIMO ALCANZADO")
+    suma = gp.quicksum(v.x for v in  model.getVars() if v.Varname[0] == "x")
+    suma_renov = gp.quicksum(v.x for v in  model.getVars() if v.VarName[0] == "x" and int(v.Varname[1]) in P_R)
+    print("="*80)
+    print(f"Proporción energia renovable / energia total: {suma_renov / suma} = {suma_renov.getConstant() / suma.getConstant()}")
+    print(f"Costo total del óptimo: {model.ObjVal}")
+    print(f"Tiempo de construcción del modelo: {round(tiempo_tomado, 4)} (s)")
+    print(f"Tiempo usado por el solver: {round(model.Runtime, 4)} (s)")
+    print(f"Tiempo total: {round(tiempo_tomado + model.Runtime, 4)} (s)")
+    print("="*80)
+elif model.status == gp.GRB.INFEASIBLE:
+    print("Estado del modelo: INFACTIBLE")
+

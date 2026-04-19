@@ -1,11 +1,14 @@
 from lector import leer_datos
 import gurobipy as gp
-import sys
+import sys, time
 
 path = sys.argv[1]
 P, P_R, S, S_R, S_M, C, d, d_r, c_p, e_min, e_max, o_min, o_max, LR, t_ps, q_sc = leer_datos(path)
 
 model = gp.Model()
+model.Params.OutputFlag = 0
+print("Comenzando el modelo...")
+tiempo_inicio = time.time()
 
 # Por default addVars pone un lower_bound = 0
 # Variables
@@ -16,25 +19,25 @@ x["O"] = model.addVars([f"p_{i}" for i in P], vtype=gp.GRB.CONTINUOUS, name="O -
 # Flujo de P a S
 for i in P:
     if i in P_R:
-        x[f"p_{i}"] = model.addVars([f"s_{j}r" for j in S], name=f"p_{i} -> S")
+        x[f"p_{i}"] = model.addVars([f"s_{j}r" for j in S], name=f"s{i}")
     else:
-        x[f"p_{i}"] = model.addVars([f"s_{j}c" for j in S_M], name=f"p_{i} -> Sc")
+        x[f"p_{i}"] = model.addVars([f"s_{j}c" for j in S_M], name=f"c{i}")
 
 # Flujo de S a S auxiliar
 for i in S:
-    x[f"s_{i}r"] = model.addVars([f"s_{i}ra"], name=f"s_{i}r -> s_{i}ra")
+    x[f"s_{i}r"] = model.addVars([f"s_{i}ra"], name=f".s_{i}r -> s_{i}ra")
     if i in S_M:
-        x[f"s_{i}c"] = model.addVars([f"s_{i}ca"], name=f"s_{i}c -> s_{i}ca")
+        x[f"s_{i}c"] = model.addVars([f"s_{i}ca"], name=f".s_{i}c -> s_{i}ca")
 
 # Flujo de S auxiliar a U
 for i in S:
-    x[f"s_{i}ra"] = model.addVars([f"u_{j}r" for j in C], name=f"s_{i}ra -> Ur")
+    x[f"s_{i}ra"] = model.addVars([f"u_{j}r" for j in C], name=f".s_{i}ra -> Ur")
     if i in S_M:
-        x[f"s_{i}ca"] = model.addVars([f"u_{j}" for j in C],  name=f"s_{i}ca -> U")
+        x[f"s_{i}ca"] = model.addVars([f"u_{j}" for j in C],  name=f".s_{i}ca -> U")
 
 # Flujo de U renovable a U
 for i in C:
-    x[f"u_{i}r"] = model.addVars([f"u_{i}"], name=f"u_{i}r -> u_{i}")
+    x[f"u_{i}r"] = model.addVars([f"u_{i}"], name=f".u_{i}r -> u_{i}")
 
 
 # Función objetivo
@@ -82,7 +85,27 @@ for i in C:
 model.addConstrs((x[f"s_{i}r"][f"s_{i}ra"] + x[f"s_{i}c"][f"s_{i}ca"] <= o_max[i] for i in S_M))
 model.addConstrs((x[f"s_{i}r"][f"s_{i}ra"] + x[f"s_{i}c"][f"s_{i}ca"] >= o_min[i] for i in S_M))
 
-model.Params.Method = 0
-model.Params.NetworkAlg = 1
+#model.Params.Method = 0
+#model.Params.NetworkAlg = 1
+
+# Fin del modelo
+tiempo_final = time.time()
+tiempo_tomado = tiempo_final - tiempo_inicio
+
+print("El modelo ha terminado de construirse. Resolviendo...")
 
 model.optimize()
+
+if model.status == gp.GRB.OPTIMAL:
+    print(f"Estado del modelo: OPTIMO ALCANZADO")
+    suma = gp.quicksum(v.x for v in  model.getVars() if v.Varname[0] == "c" or v.Varname[0] == "s")
+    suma_renov = gp.quicksum(v.x for v in  model.getVars() if v.VarName[0] == "s")
+    print("="*80)
+    print(f"Proporción energia renovable / energia total: {suma_renov / suma} = {suma_renov.getConstant() / suma.getConstant()}")
+    print(f"Costo total del óptimo: {model.ObjVal}")
+    print(f"Tiempo de construcción del modelo: {round(tiempo_tomado, 4)} (s)")
+    print(f"Tiempo usado por el solver: {round(model.Runtime, 4)} (s)")
+    print(f"Tiempo total: {round(tiempo_tomado + model.Runtime, 4)} (s)")
+    print("="*80)
+elif model.status == gp.GRB.INFEASIBLE:
+    print("Estado del modelo: INFACTIBLE")
